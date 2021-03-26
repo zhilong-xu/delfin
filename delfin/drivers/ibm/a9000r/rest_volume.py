@@ -13,15 +13,15 @@ LOG = logging.getLogger(__name__)
 
 class RestVolume(RestClient):
 
-    REST_AUTH_URL = '/api/types/loginSessionInfo/instances'
-    REST_STORAGE_URL = '/api/types/system/instances'
-    REST_CAPACITY_URL = '/api/types/systemCapacity/instances'
-    REST_SOFT_VERSION_URL = '/api/types/installedSoftwareVersion/instances'
+    # REST_AUTH_URL = '/api/types/loginSessionInfo/instances'
+    # REST_STORAGE_URL = '/api/types/system/instances'
+    # REST_CAPACITY_URL = '/api/types/systemCapacity/instances'
+    # REST_SOFT_VERSION_URL = '/api/types/installedSoftwareVersion/instances'
     REST_VOLUME_URL = '/xiv/v3/volumes'
-    REST_POOLS_URL = '/api/types/pool/instances'
-    REST_ALERTS_URL = '/api/types/alert/instances'
-    REST_DEL_ALERTS_URL = '/api/instances/alert/'
-    REST_LOGOUT_URL = '/api/types/loginSessionInfo/action/logout'
+    # REST_POOLS_URL = '/api/types/pool/instances'
+    # REST_ALERTS_URL = '/api/types/alert/instances'
+    # REST_DEL_ALERTS_URL = '/api/instances/alert/'
+    # REST_LOGOUT_URL = '/api/types/loginSessionInfo/action/logout'
     AUTH_KEY = 'EMC-CSRF-TOKEN'
     STATE_SOLVED = 2
 
@@ -57,12 +57,8 @@ class RestVolume(RestClient):
             LOG.error("Login error: %s", six.text_type(e))
             raise e
 
-    def get_all_rest_volumes(self, page_number):
-        url = '%s?%s&page=%s' % (RestVolume.REST_VOLUME_URL,
-                                 'fields=id,name,health,type,sizeAllocated,'
-                                 'sizeTotal,sizeUsed,pool,wwn,isThinEnabled',
-                                 page_number)
-        result_json = self.get_rest_info(url)
+    def get_all_rest_volumes(self):
+        result_json = self.get_rest_info(RestVolume.REST_VOLUME_URL)
         return result_json
 
     def get_rest_info(self, url, data=None, method='GET'):
