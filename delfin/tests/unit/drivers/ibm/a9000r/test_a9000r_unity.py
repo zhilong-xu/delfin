@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import sys
+
 from unittest import TestCase, mock
+
 sys.modules['delfin.cryptor'] = mock.Mock()
 from delfin import context
 from delfin.drivers.ibm.a9000r.rest_volume import RestVolume
 from delfin.drivers.ibm.a9000r.unity_volume import UnityVolume
+from delfin.drivers.ibm.a9000r.ssh_volume import SSHVolume
 
 ACCESS_INFO = {
     "storage_id": "12345",
@@ -49,6 +52,44 @@ GET_ALL_VOLUME = {
         "estimated_min_delete_size": "0"
     }
 }
+GET_STORAGE = {
+    "system": {
+        "hard_capacity": "",
+        "safe_mode": "false",
+        "system_state": "on",
+        "soft_capacity": "",
+        "compression_state": "",
+        "free_soft_capacity": "",
+        "ref": "/xiv/v3/systems/:gen4d-64b",
+        "target_state": "on",
+        "name": "gen4d-64b",
+        "physical_free": "1937000000000",
+        "redundancy_status": "Fully Protected",
+        "id": "XIV gen4d-64b:6013794:9835:415",
+        "physical_size": "1963000000000",
+        "serial_number": "12",
+        "firmware_version": "10.2"
+    },
+}
+SERIAL_NUMBER = "12"
+FIRMWARE_VERSION = "10.2"
+
+GET_POOL = {
+    "pool": {
+        "used_by_snapshots": "0",
+        "snapshot_size": "309000000000",
+        "size": "23050000000000",
+        "id": "6dc714800006",
+        "ref": "/xiv/v3/:6011947b/pools/:Clippers",
+        "system": "6011947b",
+        "used_by_volumes": "860000000000",
+        "name": "Clippers",
+        "domain": "no-domain",
+        "locked": "false",
+        "perf_class_ref": "/xiv/v3/:gen4d-54c/perf_classes/:TaylorS",
+        "perf_class": "TaylorS"
+    }
+}
 
 
 class TestUNITYStorDriver(TestCase):
@@ -62,3 +103,27 @@ class TestUNITYStorDriver(TestCase):
         self.assertEqual(volume.get("volume").get("native_volume_id"), GET_ALL_VOLUME.get("volume").get("id"))
         self.assertEqual(volume.get("volume").get("total_capacity"), GET_ALL_VOLUME.get("volume").get("size"))
         self.assertEqual(volume.get("volume").get("used_capacity"), GET_ALL_VOLUME.get("volume").get("used_capacity"))
+
+    @mock.patch.object(RestVolume, 'get_storage')
+    @mock.patch.object(SSHVolume, 'get_storage_serial_number')
+    @mock.patch.object(SSHVolume, 'get_storage_version_get')
+    def test_get_storage(self, firmware_version, serial_number, get_storage):
+        RestVolume.login = mock.Mock(return_value=None)
+        # 注意mock先后的顺序
+        get_storage.return_value = GET_STORAGE
+        serial_number.return_value = SERIAL_NUMBER
+        firmware_version.return_value = FIRMWARE_VERSION
+        volume = UnityVolume(**ACCESS_INFO).get_storage(context)
+        self.assertEqual(volume.get("system").get("name"), GET_STORAGE.get("system").get("name"))
+        self.assertEqual(volume.get("system").get("serial_number"), "12")
+        self.assertEqual(volume.get("system").get("version_get"), "10.2")
+
+    @mock.patch.object(RestVolume, 'get_all_pools')
+    def test_list_storage_pools(self, mock_lun):
+        RestVolume.login = mock.Mock(return_value=None)
+        mock_lun.side_effect = [GET_POOL]
+        volume = UnityVolume(**ACCESS_INFO).list_storage_pools(context)
+        self.assertEqual(volume.get("pool").get("name"), GET_POOL.get("pool").get("name"))
+        self.assertEqual(volume.get("pool").get("native_storage_pool_id"), GET_POOL.get("pool").get("id"))
+        self.assertEqual(volume.get("pool").get("total_capacity"), GET_POOL.get("pool").get("size"))
+        self.assertEqual(volume.get("pool").get("used_capacity"), GET_POOL.get("pool").get("used_by_volumes"))

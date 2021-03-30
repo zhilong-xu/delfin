@@ -1,4 +1,3 @@
-
 import threading
 
 import requests
@@ -11,14 +10,14 @@ from delfin.drivers.utils.rest_client import RestClient
 
 LOG = logging.getLogger(__name__)
 
-class RestVolume(RestClient):
 
+class RestVolume(RestClient):
     # REST_AUTH_URL = '/api/types/loginSessionInfo/instances'
-    # REST_STORAGE_URL = '/api/types/system/instances'
+    REST_STORAGE_URL = '/xiv/v3/systems'
     # REST_CAPACITY_URL = '/api/types/systemCapacity/instances'
     # REST_SOFT_VERSION_URL = '/api/types/installedSoftwareVersion/instances'
     REST_VOLUME_URL = '/xiv/v3/volumes'
-    # REST_POOLS_URL = '/api/types/pool/instances'
+    REST_POOLS_URL = '/xiv/v3/pools'
     # REST_ALERTS_URL = '/api/types/alert/instances'
     # REST_DEL_ALERTS_URL = '/api/instances/alert/'
     # REST_LOGOUT_URL = '/api/types/loginSessionInfo/action/logout'
@@ -57,10 +56,22 @@ class RestVolume(RestClient):
             LOG.error("Login error: %s", six.text_type(e))
             raise e
 
+    # 示列卷
     def get_all_rest_volumes(self):
         result_json = self.get_rest_info(RestVolume.REST_VOLUME_URL)
         return result_json
 
+    # 系统查询
+    def get_storage(self):
+        result_json = self.get_rest_info(RestVolume.REST_STORAGE_URL)
+        return result_json
+
+    # 池
+    def get_all_pools(self):
+        result_json = self.get_rest_info(RestVolume.REST_POOLS_URL)
+        return result_json
+
+    # 请求远程方法
     def get_rest_info(self, url, data=None, method='GET'):
         result_json = None
         # res = self.call(url, data, method)
@@ -73,20 +84,7 @@ class RestVolume(RestClient):
 
     # 自定义远程调用方法 暂时不用
     def call(self, url, data=None, method=None):
-        try:
-            res = self.call_with_token(url, data, method)
-            if res.status_code == 401:
-                LOG.error("Failed to get token, status_code:%s,error_mesg:%s" %
-                          (res.status_code, res.text))
-                self.login()
-                res = self.call_with_token(url, data, method)
-            elif res.status_code == 503:
-                raise exception.InvalidResults(res.text)
-            return res
-        except Exception as e:
-            LOG.error("Method:%s,url:%s failed: %s" % (method, url,
-                                                       six.text_type(e)))
-            raise e
+        pass
 
     def call_with_token(self, url, data, method):
         auth_key = None

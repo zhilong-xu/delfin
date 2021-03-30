@@ -4,7 +4,7 @@ import json
 from oslo_log import log
 from delfin.common import constants
 
-from delfin.drivers.ibm.a9000r import rest_volume
+from delfin.drivers.ibm.a9000r import rest_volume, ssh_volume
 from delfin.drivers import driver
 
 LOG = log.getLogger(__name__)
@@ -16,6 +16,7 @@ class UnityVolume(driver.StorageDriver):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.rest_volume = rest_volume.RestVolume(**kwargs)
+        self.ssh_volume = ssh_volume.SSHVolume(**kwargs)
         self.rest_volume.login()
 
     # 列示卷
@@ -35,7 +36,7 @@ class UnityVolume(driver.StorageDriver):
                 volume_dict["storage_id"] = self.storage_id
                 # 无法获取，这里会是空
                 volume_dict["description"] = volumeStr.get("description")
-                volume_dict["status"] = constants.VolumeStatus.AVAILABLE
+                volume_dict["status"] = constants.ControllerStatus.NORMAL
                 volume_dict["native_volume_id"] = volumeStr.get("id")
                 volume_dict["native_storage_pool_id"] = volumeStr.get("pool")
                 volume_dict["type"] = constants.VolumeType.THICK
@@ -56,67 +57,42 @@ class UnityVolume(driver.StorageDriver):
         # return self.rest_handler.remove_alert(alert)
         pass
 
+    # 系统
     def get_storage(self, context):
-        # system_info = self.rest_handler.get_storage()
-        # capacity = self.rest_handler.get_capacity()
-        # version_info = self.rest_handler.get_soft_version()
-        # status = constants.StorageStatus.OFFLINE
-        # if system_info is not None and capacity is not None:
-        #     system_entries = system_info.get('entries')
-        #     for system in system_entries:
-        #         content = system.get('content', {})
-        #         name = content.get('name')
-        #         model = content.get('model')
-        #         serial_number = content.get('serialNumber')
-        #         health_value = content.get('health').get('value')
-        #         if health_value in UnityStorDriver.HEALTH_OK:
-        #             status = constants.StorageStatus.NORMAL
-        #         else:
-        #             status = constants.StorageStatus.ABNORMAL
-        #         break
-        #     capacity_info = capacity.get('entries')
-        #     for per_capacity in capacity_info:
-        #         content = per_capacity.get('content', {})
-        #         free = content.get('sizeFree')
-        #         total = content.get('sizeTotal')
-        #         used = content.get('sizeUsed')
-        #         subs = content.get('sizeSubscribed')
-        #         break
-        #     soft_version = version_info.get('entries')
-        #     for soft_info in soft_version:
-        #         content = soft_info.get('content', {})
-        #         version = content.get('id')
-        #         break
-        #     system_result = {
-        #         'name': name,
-        #         'vendor': 'DELL EMC',
-        #         'model': model,
-        #         'status': status,
-        #         'serial_number': serial_number,
-        #         'firmware_version': version,
-        #         'location': '',
-        #         'subscribed_capacity': int(subs),
-        #         'total_capacity': int(total),
-        #         'raw_capacity': int(total),
-        #         'used_capacity': int(used),
-        #         'free_capacity': int(free)
-        #     }
-        # return system_result
-        pass
+        # 通过https请求调用返回数据
+        system_info = self.rest_volume.get_storage()
+        # 开始封装数据
+        storage_system = dict()
+        system = dict()
+        if system_info is not None and any(system_info):
+            systemObject = system_info.get("system")
+            system["name"] = systemObject.get("name")
+            system["vender"] = self.storage_id
+            # 这里会使空，无法获取
+            system["description"] = systemObject.get("description")
+            system["model"] = systemObject.get("safe_mode")
+            status = constants.ControllerStatus.NORMAL if systemObject.get('system_state') == 'on' \
+                else constants.ControllerStatus.OFFLINE
+            system["status"] = status
+            # 这里会使空，无法获取
+            system["location"] = systemObject.get("location")
+            # 这里会使空，无法获取
+            system["raw_capacity"] = systemObject.get("raw_capacity")
+            physicalSize = systemObject.get("physical_size")
+            system["total_capacity"] = physicalSize
+            physicalFree = systemObject.get("physical_free")
+            system["free_capacity"] = physicalFree
+            # 相减计算used_capacity
+            system["used_capacity"] = int(physicalSize) - int(physicalFree)
+
+        # cli 获取的字段
+        system["serial_number"] = self.ssh_volume.get_storage_serial_number()
+        system["version_get"] = self.ssh_volume.get_storage_version_get()
+        # system 放进 storage_system
+        storage_system["system"] = system
+        return storage_system
 
     def list_alerts(self, context, query_para=None):
-        # page_number = 1
-        # alert_model_list = []
-        # while True:
-        #     alert_list = self.rest_handler.get_all_alerts(page_number)
-        #     if 'entries' not in alert_list:
-        #         break
-        #     if len(alert_list['entries']) < 1:
-        #         break
-        #     alert_handler.AlertHandler() \
-        #         .parse_queried_alerts(alert_model_list, alert_list, query_para)
-        #     page_number = page_number + 1
-        # return alert_model_list
         pass
 
     def list_controllers(self, context):
@@ -128,34 +104,28 @@ class UnityVolume(driver.StorageDriver):
     def list_ports(self, context):
         pass
 
+    # 池
     def list_storage_pools(self, context):
-        # pool_info = self.rest_handler.get_all_pools()
-        # pool_list = []
-        # pool_type = constants.StorageType.UNIFIED
-        # if pool_info is not None:
-        #     pool_entries = pool_info.get('entries')
-        #     for pool in pool_entries:
-        #         content = pool.get('content', {})
-        #         health_value = content.get('health').get('value')
-        #         if health_value in UnityStorDriver.HEALTH_OK:
-        #             status = constants.StorageStatus.NORMAL
-        #         else:
-        #             status = constants.StorageStatus.ABNORMAL
-        #         pool_result = {
-        #             'name': content.get('name'),
-        #             'storage_id': self.storage_id,
-        #             'native_storage_pool_id': str(content.get('id')),
-        #             'description': content.get('description'),
-        #             'status': status,
-        #             'storage_type': pool_type,
-        #             'total_capacity': int(content.get('sizeTotal')),
-        #             'subscribed_capacity': int(content.get('sizeSubscribed')),
-        #             'used_capacity': int(content.get('sizeUsed')),
-        #             'free_capacity': int(content.get('sizeFree'))
-        #         }
-        #         pool_list.append(pool_result)
-        # return pool_list
-        pass
+        pool_info = self.rest_volume.get_all_pools()
+        pool_Object = dict()
+        pool = dict()
+        if pool_info is not None and any(pool_info):
+            pool_return = pool_info.get("pool")
+            pool["name"] = pool_return.get("name")
+            pool["storage_id"] = self.storage_id
+            pool["native_storage_pool_id"] = pool_return.get("id")
+            # description 暂时无法获取 会为None
+            pool["description"] = pool_return.get("description")
+            pool["status"] = constants.ControllerStatus.NORMAL
+            pool["storage_type"] = constants.StorageType.BLOCK
+            # 需要计算的
+            total_capacity = pool_return.get("size")
+            pool["total_capacity"] = total_capacity
+            used_by_volumes = pool_return.get("used_by_volumes")
+            pool["used_capacity"] = used_by_volumes
+            pool["free_capacity"] = int(total_capacity) - int(used_by_volumes)
+        pool_Object["pool"] = pool
+        return pool_Object
 
     def remove_trap_config(self, context, trap_config):
         pass
@@ -164,4 +134,16 @@ class UnityVolume(driver.StorageDriver):
         # self.rest_handler.logout()
         # self.rest_handler.verify = kwargs.get('verify', False)
         # self.rest_handler.login()
+        pass
+
+    def list_quotas(self, context):
+        pass
+
+    def list_filesystems(self, context):
+        pass
+
+    def list_qtrees(self, context):
+        pass
+
+    def list_shares(self, context):
         pass
