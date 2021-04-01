@@ -1,18 +1,19 @@
 import threading
 
-import requests
 import six
 from oslo_log import log as logging
+import requests
 
 from delfin import cryptor
 from delfin import exception
 from delfin.drivers.utils.rest_client import RestClient
+from delfin.drivers.utils.ssh_client import SSHPool
 
 LOG = logging.getLogger(__name__)
 
 
-class RestVolume(RestClient):
-    # REST_AUTH_URL = '/api/types/loginSessionInfo/instances'
+class RestHandler(RestClient):
+    REST_AUTH_URL = '/api/types/loginSessionInfo/instances'
     REST_STORAGE_URL = '/xiv/v3/systems'
     # REST_CAPACITY_URL = '/api/types/systemCapacity/instances'
     # REST_SOFT_VERSION_URL = '/api/types/installedSoftwareVersion/instances'
@@ -25,7 +26,8 @@ class RestVolume(RestClient):
     STATE_SOLVED = 2
 
     def __init__(self, **kwargs):
-        super(RestVolume, self).__init__(**kwargs)
+        # self.ssh_pool = SSHPool(**kwargs)
+        super(RestHandler, self).__init__(**kwargs)
         self.session_lock = threading.Lock()
 
     def login(self):
@@ -39,13 +41,13 @@ class RestVolume(RestClient):
                 self.session.auth = requests.auth.HTTPBasicAuth(
                     self.rest_username, cryptor.decode(self.rest_password))
                 res = self.call_with_token(
-                    RestVolume.REST_AUTH_URL, data, 'GET')
+                    RestHandler.REST_AUTH_URL, data, 'GET')
                 if res.status_code == 200:
-                    self.session.headers[RestVolume.AUTH_KEY] = \
-                        cryptor.encode(res.headers[RestVolume.AUTH_KEY])
+                    self.session.headers[RestHandler.AUTH_KEY] = \
+                        cryptor.encode(res.headers[RestHandler.AUTH_KEY])
                 else:
                     LOG.error("Login error.URL: %s,Reason: %s.",
-                              RestVolume.REST_AUTH_URL, res.text)
+                              RestHandler.REST_AUTH_URL, res.text)
                     if 'Unauthorized' in res.text:
                         raise exception.InvalidUsernameOrPassword()
                     elif 'Forbidden' in res.text:
@@ -58,17 +60,17 @@ class RestVolume(RestClient):
 
     # 示列卷
     def get_all_rest_volumes(self):
-        result_json = self.get_rest_info(RestVolume.REST_VOLUME_URL)
+        result_json = self.get_rest_info(RestHandler.REST_VOLUME_URL)
         return result_json
 
     # 系统查询
     def get_storage(self):
-        result_json = self.get_rest_info(RestVolume.REST_STORAGE_URL)
+        result_json = self.get_rest_info(RestHandler.REST_STORAGE_URL)
         return result_json
 
     # 池
     def get_all_pools(self):
-        result_json = self.get_rest_info(RestVolume.REST_POOLS_URL)
+        result_json = self.get_rest_info(RestHandler.REST_POOLS_URL)
         return result_json
 
     # 请求远程方法
@@ -82,18 +84,14 @@ class RestVolume(RestClient):
             result_json = res.json()
         return result_json
 
-    # 自定义远程调用方法 暂时不用
-    def call(self, url, data=None, method=None):
-        pass
-
     def call_with_token(self, url, data, method):
         auth_key = None
         if self.session:
-            auth_key = self.session.headers.get(RestVolume.AUTH_KEY, None)
+            auth_key = self.session.headers.get(RestHandler.AUTH_KEY, None)
             if auth_key:
-                self.session.headers[RestVolume.AUTH_KEY] \
+                self.session.headers[RestHandler.AUTH_KEY] \
                     = cryptor.decode(auth_key)
         res = self.do_call(url, data, method)
         if auth_key:
-            self.session.headers[RestVolume.AUTH_KEY] = auth_key
+            self.session.headers[RestHandler.AUTH_KEY] = auth_key
         return res

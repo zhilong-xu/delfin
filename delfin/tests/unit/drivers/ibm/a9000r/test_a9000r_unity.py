@@ -17,9 +17,9 @@ from unittest import TestCase, mock
 
 sys.modules['delfin.cryptor'] = mock.Mock()
 from delfin import context
-from delfin.drivers.ibm.a9000r.rest_volume import RestVolume
-from delfin.drivers.ibm.a9000r.unity_volume import UnityVolume
-from delfin.drivers.ibm.a9000r.ssh_volume import SSHVolume
+from delfin.drivers.ibm.a9000r.rest_handler import RestHandler
+from delfin.drivers.ibm.a9000r.unity import Unity
+from delfin.drivers.ibm.a9000r.ssh_handler import SSHHandler
 
 ACCESS_INFO = {
     "storage_id": "12345",
@@ -28,6 +28,13 @@ ACCESS_INFO = {
         "port": "8443",
         "username": "username",
         "password": "cGFzc3dvcmQ="
+    },
+    "ssh": {
+        "host": "110.143.132.231",
+        "port": 22,
+        "username": "user",
+        "password": "pass",
+        "pub_key": "cGFzc3dvcmQ="
     }
 }
 
@@ -91,38 +98,43 @@ GET_POOL = {
     }
 }
 
+STATUS_CODE = {
+    "status_code": 200
+}
 
 class TestUNITYStorDriver(TestCase):
 
-    @mock.patch.object(RestVolume, 'get_all_rest_volumes')
+    @mock.patch.object(RestHandler, 'get_all_rest_volumes')
+    # @mock.patch.object(RestHandler, 'call_with_token')
     def test_list_volumes(self, mock_lun):
-        RestVolume.login = mock.Mock(return_value=None)
+        RestHandler.login = mock.Mock(return_value=None)
+        # mock_call_with_token.side_effect = STATUS_CODE
         mock_lun.side_effect = [GET_ALL_VOLUME]
-        volume = UnityVolume(**ACCESS_INFO).list_volumes(context)
+        volume = Unity(**ACCESS_INFO).list_volumes(context)
         self.assertEqual(volume.get("volume").get("name"), GET_ALL_VOLUME.get("volume").get("name"))
         self.assertEqual(volume.get("volume").get("native_volume_id"), GET_ALL_VOLUME.get("volume").get("id"))
         self.assertEqual(volume.get("volume").get("total_capacity"), GET_ALL_VOLUME.get("volume").get("size"))
         self.assertEqual(volume.get("volume").get("used_capacity"), GET_ALL_VOLUME.get("volume").get("used_capacity"))
 
-    @mock.patch.object(RestVolume, 'get_storage')
-    @mock.patch.object(SSHVolume, 'get_storage_serial_number')
-    @mock.patch.object(SSHVolume, 'get_storage_version_get')
+    @mock.patch.object(RestHandler, 'get_storage')
+    @mock.patch.object(SSHHandler, 'get_storage_serial_number')
+    @mock.patch.object(SSHHandler, 'get_storage_version_get')
     def test_get_storage(self, firmware_version, serial_number, get_storage):
-        RestVolume.login = mock.Mock(return_value=None)
+        RestHandler.login = mock.Mock(return_value=None)
         # 注意mock先后的顺序
         get_storage.return_value = GET_STORAGE
         serial_number.return_value = SERIAL_NUMBER
         firmware_version.return_value = FIRMWARE_VERSION
-        volume = UnityVolume(**ACCESS_INFO).get_storage(context)
+        volume = Unity(**ACCESS_INFO).get_storage(context)
         self.assertEqual(volume.get("system").get("name"), GET_STORAGE.get("system").get("name"))
         self.assertEqual(volume.get("system").get("serial_number"), "12")
         self.assertEqual(volume.get("system").get("version_get"), "10.2")
 
-    @mock.patch.object(RestVolume, 'get_all_pools')
+    @mock.patch.object(RestHandler, 'get_all_pools')
     def test_list_storage_pools(self, mock_lun):
-        RestVolume.login = mock.Mock(return_value=None)
+        RestHandler.login = mock.Mock(return_value=None)
         mock_lun.side_effect = [GET_POOL]
-        volume = UnityVolume(**ACCESS_INFO).list_storage_pools(context)
+        volume = Unity(**ACCESS_INFO).list_storage_pools(context)
         self.assertEqual(volume.get("pool").get("name"), GET_POOL.get("pool").get("name"))
         self.assertEqual(volume.get("pool").get("native_storage_pool_id"), GET_POOL.get("pool").get("id"))
         self.assertEqual(volume.get("pool").get("total_capacity"), GET_POOL.get("pool").get("size"))

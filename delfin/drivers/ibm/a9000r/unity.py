@@ -1,30 +1,30 @@
-import ast
-import json
+
 
 from oslo_log import log
 from delfin.common import constants
 
-from delfin.drivers.ibm.a9000r import rest_volume, ssh_volume
+from delfin.drivers.ibm.a9000r import rest_handler, ssh_handler
 from delfin.drivers import driver
 
 LOG = log.getLogger(__name__)
 
 
 # 卷
-class UnityVolume(driver.StorageDriver):
+class Unity(driver.StorageDriver):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.rest_volume = rest_volume.RestVolume(**kwargs)
-        self.ssh_volume = ssh_volume.SSHVolume(**kwargs)
-        self.rest_volume.login()
+        self.rest_handler = rest_handler.RestHandler(**kwargs)
+        self.rest_handler.login()
+        self.ssh_handler = ssh_handler.SSHHandler(**kwargs)
+        # self.ssh_handler.login()
 
     # 列示卷
     def list_volumes(self, context):
         volume = dict()
         volume_dict = dict()
         # 请求查询接口
-        volumes = self.rest_volume.get_all_rest_volumes(self)
+        volumes = self.rest_handler.get_all_rest_volumes(self)
         self.volume_handler(volumes, volume_dict, volume)
         return volume
 
@@ -60,7 +60,7 @@ class UnityVolume(driver.StorageDriver):
     # 系统
     def get_storage(self, context):
         # 通过https请求调用返回数据
-        system_info = self.rest_volume.get_storage()
+        system_info = self.rest_handler.get_storage()
         # 开始封装数据
         storage_system = dict()
         system = dict()
@@ -86,8 +86,8 @@ class UnityVolume(driver.StorageDriver):
             system["used_capacity"] = int(physicalSize) - int(physicalFree)
 
         # cli 获取的字段
-        system["serial_number"] = self.ssh_volume.get_storage_serial_number()
-        system["version_get"] = self.ssh_volume.get_storage_version_get()
+        system["serial_number"] = self.ssh_handler.get_storage_serial_number()
+        system["version_get"] = self.ssh_handler.get_storage_version_get()
         # system 放进 storage_system
         storage_system["system"] = system
         return storage_system
@@ -106,7 +106,7 @@ class UnityVolume(driver.StorageDriver):
 
     # 池
     def list_storage_pools(self, context):
-        pool_info = self.rest_volume.get_all_pools()
+        pool_info = self.rest_handler.get_all_pools()
         pool_Object = dict()
         pool = dict()
         if pool_info is not None and any(pool_info):
