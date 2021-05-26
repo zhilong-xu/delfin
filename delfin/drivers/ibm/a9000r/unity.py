@@ -24,7 +24,7 @@ class Unity(driver.StorageDriver):
         volume = dict()
         volume_dict = dict()
         # 请求查询接口
-        volumes = self.rest_handler.get_all_rest_volumes(self)
+        volumes = self.rest_handler.get_all_rest_volumes()
         self.volume_handler(volumes, volume_dict, volume)
         return volume
 
@@ -42,11 +42,11 @@ class Unity(driver.StorageDriver):
                 volume_dict["type"] = constants.VolumeType.THICK
 
                 # 需要计算的
-                totalCapacity = volumeStr.get("size")
+                totalCapacity = int(volumeStr.get("size"))
                 volume_dict["total_capacity"] = totalCapacity
-                usedCapacity = volumeStr.get("used_capacity")
+                usedCapacity = int(volumeStr.get("used_capacity"))
                 volume_dict["used_capacity"] = usedCapacity
-                free_capacity = int(totalCapacity) - int(usedCapacity)
+                free_capacity = totalCapacity - usedCapacity
                 volume_dict["free_capacity"] = free_capacity
         volume["volume"] = volume_dict
 
@@ -78,12 +78,12 @@ class Unity(driver.StorageDriver):
             system["location"] = systemObject.get("location")
             # 这里会使空，无法获取
             system["raw_capacity"] = systemObject.get("raw_capacity")
-            physicalSize = systemObject.get("physical_size")
+            physicalSize = int(systemObject.get("physical_size"))
             system["total_capacity"] = physicalSize
-            physicalFree = systemObject.get("physical_free")
+            physicalFree = int(systemObject.get("physical_free"))
             system["free_capacity"] = physicalFree
             # 相减计算used_capacity
-            system["used_capacity"] = int(physicalSize) - int(physicalFree)
+            system["used_capacity"] = physicalSize - physicalFree
 
         # cli 获取的字段
         system["serial_number"] = self.ssh_handler.get_storage_serial_number()
@@ -119,11 +119,11 @@ class Unity(driver.StorageDriver):
             pool["status"] = constants.ControllerStatus.NORMAL
             pool["storage_type"] = constants.StorageType.BLOCK
             # 需要计算的
-            total_capacity = pool_return.get("size")
+            total_capacity = int(pool_return.get("size"))
             pool["total_capacity"] = total_capacity
-            used_by_volumes = pool_return.get("used_by_volumes")
+            used_by_volumes = int(pool_return.get("used_by_volumes"))
             pool["used_capacity"] = used_by_volumes
-            pool["free_capacity"] = int(total_capacity) - int(used_by_volumes)
+            pool["free_capacity"] = total_capacity - used_by_volumes
         pool_Object["pool"] = pool
         return pool_Object
 
